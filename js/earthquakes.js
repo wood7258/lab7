@@ -33,28 +33,42 @@ $(document).ajaxError(function(event, jqXHR, err){
 //function to call when document is ready
 $(function(){
 	//document is ready for manipulation
-	getQuakes();
+	$('.refresh-button').click(function(){
+		getQuakes($('.min-magnitude').val());
+	});
+	getQuakes($('.min-magnitude').val());
 }); //doc ready
 
 //getQuakes()
 //queries the server for the list of recent quakes
 //and plots them on a Google map
-function getQuakes() {
-	$.getJSON(gov.usgs.quakesUrl, function(quakes){
+function getQuakes(minMagnitude) {
+	$('.message').html('Loading... <img src="img/loading.gif">');
+	//if minMagnitude was specified, add that as a filter
+	var url = gov.usgs.quakesUrl;
+	if (minMagnitude)
+		url += '&$where=magnitude>=' + minMagnitude;
+	$.getJSON(url, function(quakes){
 		//quakes is an array of objects, each of which represents info about a quake
 		//see data returned from:
 		//https://soda.demo.socrata.com/resource/earthquakes.json?$$app_token=Hwu90cjqyFghuAWQgannew7Oi
 
 		//set our global variable to the current set of quakes
 		//so we can reference it later in another event
+		if (gov.usgs.quakes)
+			$.each(gov.usgs.quakes, function(){
+				this.mapMarker.setMap(null);
+			});
 		gov.usgs.quakes = quakes;
 		$('.message').html('Displaying ' + quakes.length + ' earthquakes');
-		gov.usgs.quakesMap = new google.maps.Map($('.map-container')[0], {
-			center: new google.maps.LatLng(0,0),        //centered on 0/0
-			zoom: 2,                                    //zoom level 2
-			mapTypeId: google.maps.MapTypeId.TERRAIN,   //terrain map
-			streetViewControl: false                    //no street view
-		});
+		if (!gov.usgs.quakesMap){
+			gov.usgs.quakesMap = new google.maps.Map($('.map-container')[0], {
+				center: new google.maps.LatLng(0,0),        //centered on 0/0
+				zoom: 2,                                    //zoom level 2
+				mapTypeId: google.maps.MapTypeId.TERRAIN,   //terrain map
+				streetViewControl: false                    //no street view
+			});
+		}
 		addQuakeMarkers(quakes, gov.usgs.quakesMap);
 	});
 } //getQuakes()
@@ -76,6 +90,9 @@ function addQuakeMarkers(quakes, map) {
 			position: new google.maps.LatLng(quake.location.latitude, quake.location.longitude)
 		});
 		google.maps.event.addListener(quake.mapMarker, 'click', function(){
+			if (gov.usgs.iw) {
+				gov.usgs.iw.close();
+			}
 			//create an info window with the quake info
 			gov.usgs.iw = new google.maps.InfoWindow({
 				content: new Date(quake.datetime).toLocaleString() + 
